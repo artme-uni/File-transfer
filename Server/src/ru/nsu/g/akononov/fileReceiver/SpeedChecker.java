@@ -1,4 +1,4 @@
-package fileReceiver;
+package ru.nsu.g.akononov.fileReceiver;
 
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;

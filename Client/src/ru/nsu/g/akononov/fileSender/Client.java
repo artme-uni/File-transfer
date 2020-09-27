@@ -1,4 +1,4 @@
-package fileSender;
+package ru.nsu.g.akononov.fileSender;
 
 import java.io.File;
 import java.io.IOException;

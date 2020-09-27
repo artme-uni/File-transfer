@@ -1,4 +1,4 @@
-package fileReceiver;
+package ru.nsu.g.akononov.fileReceiver;
 
 import java.io.File;
 import java.io.FileOutputStream;

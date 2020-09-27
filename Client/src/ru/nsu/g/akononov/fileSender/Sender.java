@@ -1,7 +1,7 @@
-package fileSender;
+package ru.nsu.g.akononov.fileSender;
 
-import fileReceiver.Receiver;
-import fileReceiver.SpeedChecker;
+import ru.nsu.g.akononov.fileReceiver.Receiver;
+import ru.nsu.g.akononov.fileReceiver.SpeedChecker;
 
 import java.io.*;
 import java.net.Socket;
