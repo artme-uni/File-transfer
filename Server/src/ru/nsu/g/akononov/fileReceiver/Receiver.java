@@ -80,23 +80,31 @@ public class Receiver extends Thread {
     private void readFilePart(int partByteCount) throws IOException {
         byte[] fileBuffer = new byte[partByteCount];
         int bufferOffset = 0;
-        int remainingPart = partByteCount;
+        int remainingPartSize = partByteCount;
 
-        while (remainingPart >= PACKET_SIZE) {
-            socket.read(fileBuffer, bufferOffset, PACKET_SIZE);
-            bufferOffset += PACKET_SIZE;
-            remainingPart -= PACKET_SIZE;
-            speedChecker.checkSpeed(file.getCurrentSize() + partByteCount - remainingPart);
+        while (remainingPartSize >= PACKET_SIZE) {
+            byte[] buffer = new byte[PACKET_SIZE];
+            int readByteCount = socket.read(buffer);
+            System.arraycopy(buffer, 0, fileBuffer, bufferOffset, readByteCount);
+            bufferOffset += readByteCount;
+            remainingPartSize -= readByteCount;
+
+            speedChecker.checkSpeed(file.getCurrentSize() + partByteCount - remainingPartSize);
         }
-        if (remainingPart != 0) {
-            socket.read(fileBuffer, bufferOffset, remainingPart);
-            remainingPart -= PACKET_SIZE;
-            speedChecker.checkSpeed(file.getCurrentSize() + partByteCount - remainingPart);
+        while (remainingPartSize != 0) {
+            byte[] buffer = new byte[remainingPartSize];
+            int readByteCount = socket.read(buffer);
+            System.arraycopy(buffer, 0, fileBuffer, bufferOffset, readByteCount);
+            remainingPartSize -= readByteCount;
+            bufferOffset += readByteCount;
+
+            speedChecker.checkSpeed(file.getCurrentSize() + partByteCount - remainingPartSize);
         }
 
         file.write(fileBuffer, 0, partByteCount);
         checkSums.add(Arrays.hashCode(fileBuffer));
     }
+
 
 
     private String readFileName() throws IOException {

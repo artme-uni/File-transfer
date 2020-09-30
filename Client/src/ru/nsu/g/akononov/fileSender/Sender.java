@@ -27,6 +27,7 @@ public class Sender {
         ACK_CODE = Receiver.ACK_CODE;
 
         try {
+            socket.setSoTimeout(10000);
             socketOutput = socket.getOutputStream();
             socketInput = socket.getInputStream();
 
