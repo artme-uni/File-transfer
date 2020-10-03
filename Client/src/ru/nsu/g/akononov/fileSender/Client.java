@@ -21,9 +21,12 @@ public class Client {
             printHint(exception);
             return;
         }
-        try {
-            Socket socket = new Socket(InetAddress.getByName(address), port);
-            Sender sender = new Sender(socket, file);
+        sendFile();
+    }
+
+    public static void sendFile(){
+        try (var socket = new Socket(InetAddress.getByName(address), port);
+             var sender = new Sender(socket, file)) {
             sender.send();
         } catch (IOException e) {
             System.err.println("Cannot connect to the server " + address + ":" + port);
@@ -73,6 +76,4 @@ public class Client {
             throw new IllegalArgumentException();
         }
     }
-
-
 }

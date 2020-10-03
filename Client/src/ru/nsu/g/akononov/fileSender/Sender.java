@@ -1,82 +1,58 @@
 package ru.nsu.g.akononov.fileSender;
 
 import ru.nsu.g.akononov.fileReceiver.Receiver;
-import ru.nsu.g.akononov.fileReceiver.SpeedChecker;
+import ru.nsu.g.akononov.fileReceiver.SpeedTester;
 
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
-public class Sender {
+public class Sender implements AutoCloseable {
+    private final static int TIMEOUT = 10000;
 
-    private OutputStream socketOutput;
     private DataOutputStream out;
-    private InputStream socketInput;
     private DataInputStream in;
 
     private File file;
 
-    private final int BUFFER_SIZE;
-    private final int ACK_CODE;
-
     public Sender(Socket socket, File file) {
-        BUFFER_SIZE = Receiver.BUFFER_SIZE;
-        ACK_CODE = Receiver.ACK_CODE;
-
         try {
-            socket.setSoTimeout(10000);
-            socketOutput = socket.getOutputStream();
-            socketInput = socket.getInputStream();
-
+            socket.setSoTimeout(TIMEOUT);
+            in = new DataInputStream(socket.getInputStream());
+            out = new DataOutputStream(socket.getOutputStream());
             this.file = file;
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public void send() {
-        try (DataInputStream dataInputStream = new DataInputStream(socketInput);
-             DataOutputStream dataOutputStream = new DataOutputStream(socketOutput)) {
-            in = dataInputStream;
-            out = dataOutputStream;
+    public void send() throws IOException, RuntimeException {
+        printFileInfo();
 
-            printFileInfo();
+        sendFileName();
+        sendFileSize();
+        sendFile();
 
-            sendNameLength();
-            int nameHashCode = sendFileName();
-            checkAcknowledgment(nameHashCode);
-
-            sendFileSize();
-            int fileHashCode = sendFile();
-            checkAcknowledgment(fileHashCode);
+        if (in.readInt() == Receiver.ACK_CODE) {
             System.out.println("File " + file.getName() + " was uploaded successfully!");
-
-        } catch (IOException exception) {
-            exception.printStackTrace();
-        } catch (RuntimeException exception){
-            System.err.println(exception.getMessage());
-            exception.printStackTrace();
+        } else {
+            System.out.println("File " + file.getName() + " was NOT uploaded successfully!");
         }
     }
 
     private void printFileInfo() {
         System.out.println("File information");
         System.out.println("\t- Path: " + file.getPath());
-        System.out.println("\t- Size: " + SpeedChecker.readableByteCount(file.length()));
+        System.out.println("\t- Size: " + SpeedTester.readableByteCount(file.length()));
     }
 
-    private void sendNameLength() throws IOException {
+
+    private void sendFileName() throws IOException {
         int fileLength = file.getName().getBytes().length;
         out.writeInt(fileLength);
-    }
-
-    private int sendFileName() throws IOException {
         byte[] buffer = file.getName().getBytes(StandardCharsets.UTF_8);
         out.write(buffer);
-        return Arrays.hashCode(buffer);
     }
 
     private void sendFileSize() throws IOException {
@@ -84,36 +60,35 @@ public class Sender {
         out.writeLong(fileSize);
     }
 
-    private int sendFile() throws IOException {
-        List<Integer> checkSums = new ArrayList<>();
+    private void sendFile() throws IOException {
         FileInputStream fileInputStream = new FileInputStream(file);
 
         long remainingByteCount = file.length();
-        while (remainingByteCount >= BUFFER_SIZE) {
-            int hashCode = writeFilePart(BUFFER_SIZE, fileInputStream);
-            checkSums.add(hashCode);
-            remainingByteCount -= BUFFER_SIZE;
+        while (remainingByteCount != 0) {
+            int BUFFER_SIZE = Receiver.PACKET_SIZE;
+            int partSize = BUFFER_SIZE;
+            if (remainingByteCount < BUFFER_SIZE) {
+                partSize = (int) remainingByteCount;
+            }
+            writeFilePart(partSize, fileInputStream);
+            remainingByteCount -= partSize;
         }
-        if (remainingByteCount != 0) {
-            int hashCode = writeFilePart((int) remainingByteCount, fileInputStream);
-            checkSums.add(hashCode);
-        }
-
-        return Arrays.hashCode(checkSums.toArray());
+        fileInputStream.close();
     }
 
-    private int writeFilePart(int byteCount, FileInputStream file) throws IOException {
+    private void writeFilePart(int byteCount, FileInputStream file) throws IOException {
         byte[] buffer = new byte[byteCount];
-        file.read(buffer);
-        out.write(buffer);
-        return Arrays.hashCode(buffer);
+        int readByteCount = file.read(buffer);
+        out.write(Arrays.copyOf(buffer, readByteCount));
     }
 
-    private void checkAcknowledgment(int hashCode) throws IOException {
-        out.writeInt(hashCode);
-        int code = in.readInt();
-        if(code != ACK_CODE){
-            throw new RuntimeException("Incorrect checksum!");
+    @Override
+    public void close() {
+        try {
+            in.close();
+            out.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }

@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
-public class UploadingFile {
+public class UploadingFile implements AutoCloseable{
     private File file;
     private FileOutputStream fileOutput;
     private long expectedSize;
@@ -23,40 +23,11 @@ public class UploadingFile {
         }
     }
 
-    public void closeOutputStream() throws IOException {
-        fileOutput.flush();
-        fileOutput.close();
-    }
-
-    public void write(byte[] buffer, int offset, int length) throws IOException {
-        fileOutput.write(buffer, offset, length);
-        remainingByteCount -= buffer.length;
-    }
-
-    public boolean isReady(){
-        return remainingByteCount == 0;
-    }
-
-    public long getCurrentSize(){
-        return expectedSize - remainingByteCount;
-    }
-
-    public String getName(){
-        return file.getName();
-    }
-
-    public void setExpectedSize(long expectedSize) {
-        this.expectedSize = expectedSize;
-        remainingByteCount = expectedSize;
-    }
-
-    public long getRemainingByteCount() {
-        return remainingByteCount;
-    }
-
     private void createFile(String fileName) throws IOException {
         file = new File(ROOT_PATH + fileName);
-        file.getParentFile().mkdirs();
+        if(file.getParentFile().mkdirs()){
+            System.out.println("Create new directory \"" + file.getParentFile() + "\" for uploading files");
+        }
 
         if (!file.createNewFile()) {
             file = addExtension(fileName, 1);
@@ -80,5 +51,42 @@ public class UploadingFile {
             number++;
             return addExtension(fileName, number);
         }
+    }
+
+    public void setExpectedSize(long expectedSize) {
+        this.expectedSize = expectedSize;
+        remainingByteCount = expectedSize;
+    }
+
+    public void write(byte[] buffer) throws IOException {
+        fileOutput.write(buffer);
+        remainingByteCount -= buffer.length;
+    }
+
+    public boolean isReady(){
+        return remainingByteCount == 0;
+    }
+
+    public boolean isCorrect(){
+        return expectedSize == file.length();
+    }
+
+    public long getCurrentSize(){
+        return expectedSize - remainingByteCount;
+    }
+
+    public String getName(){
+        return file.getName();
+    }
+
+
+    public long getRemainingByteCount() {
+        return remainingByteCount;
+    }
+
+    @Override
+    public void close() throws IOException {
+        fileOutput.flush();
+        fileOutput.close();
     }
 }

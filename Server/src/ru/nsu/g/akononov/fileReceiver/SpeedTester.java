@@ -4,34 +4,34 @@ import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
 import java.util.Date;
 
-public class SpeedChecker {
+public class SpeedTester {
 
     private static final long SPEED_UPDATE_PERIOD = 1000L;
     private Date lastSpeedUpdate;
-    private long lastUploadedByteCount;
+    private long previousFileSize;
     private final Date start;
+    private final UploadingFile file;
 
-    private final String fileName;
-
-    public SpeedChecker(String fileName) {
-        this.fileName = fileName;
+    public SpeedTester(UploadingFile file) {
+        this.file = file;
         start = new Date();
         lastSpeedUpdate = start;
     }
 
-    public void checkSpeed(long uploadedBytesCount) {
+    public void check() {
         Date now = new Date();
 
         long currentPeriod = now.getTime() - lastSpeedUpdate.getTime();
         if (currentPeriod > SPEED_UPDATE_PERIOD) {
-            long averageSpeed = uploadedBytesCount * 1000 / (now.getTime() - start.getTime());
-            long difference = uploadedBytesCount - lastUploadedByteCount;
+            
+            long averageSpeed = file.getCurrentSize() * 1000 / (now.getTime() - start.getTime());
+            long difference = file.getCurrentSize() - previousFileSize;
             long currentSpeed = difference * 1000 / currentPeriod;
 
-            System.out.println("[" + fileName + "] " + "Average speed: " + readableByteCount(averageSpeed) + " /sec");
-            System.out.println("[" + fileName + "] " + "Current speed: " + readableByteCount(currentSpeed) + " /sec");
+            System.out.println("[" + file.getName() + "] " + "Average speed: " + readableByteCount(averageSpeed) + " /sec");
+            System.out.println("[" + file.getName() + "] " + "Current speed: " + readableByteCount(currentSpeed) + " /sec");
 
-            lastUploadedByteCount = uploadedBytesCount;
+            previousFileSize = file.getCurrentSize();
             lastSpeedUpdate = now;
         }
     }

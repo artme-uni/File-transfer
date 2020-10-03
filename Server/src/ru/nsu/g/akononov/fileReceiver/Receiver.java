@@ -1,131 +1,97 @@
 package ru.nsu.g.akononov.fileReceiver;
 
-import java.io.*;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
-public class Receiver extends Thread {
+public class Receiver implements AutoCloseable, Runnable {
     private static final int TIMEOUT = 10000;
-    private static final int PACKET_SIZE = 512;
 
-    public static final int BUFFER_SIZE = 4 * 1024; //min 256
-    public static final int ACK_CODE = 729;
-    public static final int ERR_CODE = 814;
+    public static final int PACKET_SIZE = 512;
+    public static final int ACK_CODE = 727;
+    public static final int ERR_CODE = 728;
 
-    private final List<Integer> checkSums = new ArrayList<>();
     private final UploadingFile file = new UploadingFile();
-    private SpeedChecker speedChecker;
 
-    private Socket mainSocket;
-    private SocketStreams socket;
+    private final DataOutputStream out;
+    private final DataInputStream in;
+    private final Socket socket;
+
 
     public Receiver(Socket socket) {
         try {
-            mainSocket = socket;
-
+            this.socket = socket;
             socket.setSoTimeout(TIMEOUT);
+
+            in = new DataInputStream(socket.getInputStream());
+            out = new DataOutputStream(socket.getOutputStream());
         } catch (IOException e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
     }
 
     @Override
     public void run() {
-        try (SocketStreams socketStreams = new SocketStreams(mainSocket)){
-            socket = socketStreams;
-
+        try {
             String fileName = readFileName();
-            long fileSize = readFileSize();
+            long fileSize = in.readLong();
             file.setExpectedSize(fileSize);
             receiveFile(fileName);
-            sendAcknowledgment();
-            System.out.println("[" + file.getName() + "] " + "File was downloaded successfully!");
-        }
-        catch (IOException | RuntimeException e) {
-            System.err.println(socket.getSocket().getInetAddress());
-            if (e.getMessage() != null) {
-                System.out.println(e.getMessage());
+
+            if(file.isCorrect()){
+                out.writeInt(ACK_CODE);
+                System.out.println("[" + file.getName() + "] " + "File was downloaded successfully!");
+            } else {
+                out.writeInt(ERR_CODE);
+                System.out.println("[" + file.getName() + "] " + "File was NOT downloaded successfully!");
             }
+        } catch (IOException | RuntimeException e) {
+            System.err.println(socket.getInetAddress() + (e.getMessage() != null ? " : " + e.getMessage() : ""));
             e.printStackTrace();
+        } finally {
+            close();
         }
     }
 
-    private void sendAcknowledgment() throws IOException {
-        int clientFileHashCode = socket.readInt();
-        int currentFileHashCode = Arrays.hashCode(checkSums.toArray());
-        if (clientFileHashCode == currentFileHashCode) {
-            socket.writeInt(ACK_CODE);
-        } else {
-            socket.writeInt(ERR_CODE);
-            throw new RuntimeException("[" + file.getName() + "] " + "Incorrect file data checksum!" +
-                    currentFileHashCode + "/" + clientFileHashCode + "\n");
-        }
+    private String readFileName() throws IOException {
+        int nameLength = in.readInt();
+        byte[] fileName = new byte[nameLength];
+        int readByteCount = in.read(fileName);
+        return new String(Arrays.copyOf(fileName, readByteCount), StandardCharsets.UTF_8);
     }
 
     private void receiveFile(String fileName) throws IOException {
         file.create(fileName);
-        speedChecker = new SpeedChecker(file.getName());
+        SpeedTester speedTester = new SpeedTester(file);
 
-        while (file.getRemainingByteCount() >= BUFFER_SIZE) {
-            readFilePart(BUFFER_SIZE);
-        }
-        if (!file.isReady()) {
-            readFilePart((int) file.getRemainingByteCount());
-        }
-    }
-
-    private void readFilePart(int partByteCount) throws IOException {
-        byte[] fileBuffer = new byte[partByteCount];
-        int bufferOffset = 0;
-        int remainingPartSize = partByteCount;
-
-        while (remainingPartSize >= PACKET_SIZE) {
-            byte[] buffer = new byte[PACKET_SIZE];
-            int readByteCount = socket.read(buffer);
-            System.arraycopy(buffer, 0, fileBuffer, bufferOffset, readByteCount);
-            bufferOffset += readByteCount;
-            remainingPartSize -= readByteCount;
-
-            speedChecker.checkSpeed(file.getCurrentSize() + partByteCount - remainingPartSize);
-        }
-        while (remainingPartSize != 0) {
-            byte[] buffer = new byte[remainingPartSize];
-            int readByteCount = socket.read(buffer);
-            System.arraycopy(buffer, 0, fileBuffer, bufferOffset, readByteCount);
-            remainingPartSize -= readByteCount;
-            bufferOffset += readByteCount;
-
-            speedChecker.checkSpeed(file.getCurrentSize() + partByteCount - remainingPartSize);
-        }
-
-        file.write(fileBuffer, 0, partByteCount);
-        checkSums.add(Arrays.hashCode(fileBuffer));
-    }
-
-
-
-    private String readFileName() throws IOException {
-        int nameLength = socket.readInt();
-
-        byte[] fileName = new byte[nameLength];
-        socket.read(fileName);
-
-        int currentHashCode = Arrays.hashCode(fileName);
-        int clientHashCode = socket.readInt();
-
-        if (currentHashCode == clientHashCode) {
-            socket.writeInt(ACK_CODE);
-            return new String(fileName, StandardCharsets.UTF_8);
-        } else {
-            socket.writeInt(ERR_CODE);
-            throw new RuntimeException("Incorrect file name checksum!");
+        while (!file.isReady()) {
+            int partSize = PACKET_SIZE;
+            if (file.getRemainingByteCount() < PACKET_SIZE) {
+                partSize = (int) file.getRemainingByteCount();
+            }
+            byte[] filePart = readFilePart(partSize);
+            file.write(filePart);
+            speedTester.check();
         }
     }
 
-    private long readFileSize() throws IOException {
-        return socket.readLong();
+    private byte[] readFilePart(int partByteCount) throws IOException {
+        byte[] buffer = new byte[partByteCount];
+        int readByteCount = in.read(buffer);
+        return Arrays.copyOf(buffer, readByteCount);
+    }
+
+    @Override
+    public void close() {
+        try {
+            file.close();
+            in.close();
+            out.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

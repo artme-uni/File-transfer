@@ -1,11 +1,8 @@
 package ru.nsu.g.akononov.fileReceiver;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.URL;
 
 public class Server {
     private static int portNumber;
@@ -17,31 +14,26 @@ public class Server {
             printHint();
             return;
         }
-        run();
+        createServer();
     }
 
-    private static void run() {
-        ServerSocket serverSocket;
-        try {
-            serverSocket = new ServerSocket(portNumber);
+    private static void createServer() {
+        try (var serverSocket = new ServerSocket(portNumber)){
             System.out.println("Server " + serverSocket.getInetAddress() + " is running.");
-        } catch (IllegalArgumentException exception) {
-            System.err.println("Illegal arguments: " + exception.getMessage());
-            return;
-        } catch (IOException e) {
-            System.err.println("Cannot create server: " + e.getMessage());
-            return;
-        }
 
-        try{
-            while (true) {
+            while (true){
                 Socket clientSocket = serverSocket.accept();
-                Receiver receiver = new Receiver(clientSocket);
-                receiver.start();
+                final var thread = new Thread(() -> {
+                    try (final var receiver = new Receiver(clientSocket)) {
+                        receiver.run();
+                    }
+                });
+                thread.start();
                 System.out.println("Client " + clientSocket.getInetAddress() + " is connected");
             }
+
         } catch (IOException e) {
-            System.err.println("Cannot accept a client request: " + e.getMessage());
+            System.err.println("Cannot create server: " + e.getMessage());
         }
     }
 
