@@ -5,19 +5,20 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 public class Server {
-    private static int portNumber;
+    private int portNumber;
 
     public static void main(String[] args) {
+        var server = new Server();
         try {
-            portNumber = parseArgs(args);
+            server.portNumber = server.parseArgs(args);
         } catch (IllegalArgumentException exception) {
-            printHint();
+            server.printHint();
             return;
         }
-        createServer();
+        server.createServer();
     }
 
-    private static void createServer() {
+    private void createServer() {
         try (var serverSocket = new ServerSocket(portNumber)){
             System.out.println("Server " + serverSocket.getInetAddress() + " is running.");
 
@@ -37,12 +38,12 @@ public class Server {
         }
     }
 
-    private static void printHint() {
+    private void printHint() {
         System.err.println("Please set the correct server port");
         System.err.println("Expected input: [PORT_NUMBER]");
     }
 
-    private static Integer parseArgs(String[] args) throws IllegalArgumentException {
+    private Integer parseArgs(String[] args) throws IllegalArgumentException {
         int portNumber;
         if (args.length == 1) {
             portNumber = Integer.parseInt(args[0]);
