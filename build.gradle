@@ -1,0 +1,25 @@
+plugins {
+    id 'java'
+}
+
+subprojects {
+    group 'ru.nsu.g.akononov'
+    version '1.0'
+
+    tasks.withType(JavaCompile) {
+        sourceCompatibility = '14'
+        targetCompatibility = '14'
+    }
+
+    repositories {
+        mavenCentral()
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}

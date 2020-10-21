@@ -67,29 +67,21 @@ public class Receiver implements AutoCloseable, Runnable {
         file.create(fileName);
         SpeedTester speedTester = new SpeedTester(file);
 
+        byte[] buffer = new byte[PACKET_SIZE];
         while (!file.isReady()) {
-            int partSize = PACKET_SIZE;
-            if (file.getRemainingByteCount() < PACKET_SIZE) {
-                partSize = (int) file.getRemainingByteCount();
-            }
-            byte[] filePart = readFilePart(partSize);
-            file.write(filePart);
-            speedTester.check();
+            int readByteCount = in.read(buffer);
+            file.write(buffer, 0, readByteCount);
+            speedTester.check(false);
         }
-    }
 
-    private byte[] readFilePart(int partByteCount) throws IOException {
-        byte[] buffer = new byte[partByteCount];
-        int readByteCount = in.read(buffer);
-        return Arrays.copyOf(buffer, readByteCount);
+        speedTester.check(true);
     }
 
     @Override
     public void close() {
+        file.close();
         try {
-            file.close();
-            in.close();
-            out.close();
+            socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

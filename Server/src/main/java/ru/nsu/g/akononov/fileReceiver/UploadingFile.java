@@ -58,11 +58,6 @@ public class UploadingFile implements AutoCloseable{
         remainingByteCount = expectedSize;
     }
 
-    public void write(byte[] buffer) throws IOException {
-        fileOutput.write(buffer);
-        remainingByteCount -= buffer.length;
-    }
-
     public boolean isReady(){
         return remainingByteCount == 0;
     }
@@ -80,13 +75,22 @@ public class UploadingFile implements AutoCloseable{
     }
 
 
-    public long getRemainingByteCount() {
-        return remainingByteCount;
+    @Override
+    public void close() {
+        try {
+            fileOutput.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
+            fileOutput.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
-    @Override
-    public void close() throws IOException {
-        fileOutput.flush();
-        fileOutput.close();
+    public void write(byte[] buffer, int i, int readByteCount) throws IOException {
+        fileOutput.write(buffer, i, readByteCount);
+        remainingByteCount -= readByteCount;
     }
 }

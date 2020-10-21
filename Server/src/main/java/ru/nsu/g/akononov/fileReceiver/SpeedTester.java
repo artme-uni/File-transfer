@@ -18,21 +18,26 @@ public class SpeedTester {
         lastSpeedUpdate = start;
     }
 
-    public void check() {
+    public void check(boolean isForced) {
         Date now = new Date();
 
         long currentPeriod = now.getTime() - lastSpeedUpdate.getTime();
-        if (currentPeriod > SPEED_UPDATE_PERIOD) {
-            
-            long averageSpeed = file.getCurrentSize() * 1000 / (now.getTime() - start.getTime());
-            long difference = file.getCurrentSize() - previousFileSize;
-            long currentSpeed = difference * 1000 / currentPeriod;
+        long totalPeriod = now.getTime() - start.getTime();
 
-            System.out.println("[" + file.getName() + "] " + "Average speed: " + readableByteCount(averageSpeed) + " /sec");
-            System.out.println("[" + file.getName() + "] " + "Current speed: " + readableByteCount(currentSpeed) + " /sec");
+        if (isForced || currentPeriod > SPEED_UPDATE_PERIOD) {
+            if (totalPeriod != 0) {
+                long averageSpeed = file.getCurrentSize() * 1000 / totalPeriod;
+                System.out.println("[" + file.getName() + "] " + "Average speed: " + readableByteCount(averageSpeed) + " /sec");
+            }
 
-            previousFileSize = file.getCurrentSize();
-            lastSpeedUpdate = now;
+            if (!isForced) {
+                long difference = file.getCurrentSize() - previousFileSize;
+                long currentSpeed = difference * 1000 / currentPeriod;
+                System.out.println("[" + file.getName() + "] " + "Current speed: " + readableByteCount(currentSpeed) + " /sec");
+
+                previousFileSize = file.getCurrentSize();
+                lastSpeedUpdate = now;
+            }
         }
     }
 
